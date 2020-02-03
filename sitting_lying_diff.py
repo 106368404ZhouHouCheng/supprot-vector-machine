@@ -5,7 +5,7 @@ date: 20200116
 content: 
 1. 找特徵
 2. 4個特徵：
-3. X軸，Y軸的變異數，
+3. Y軸的變異數，
 4. 平均壓力值，
 5. 找重心，加半徑畫圓，圓内點數/總點數
 6. 將特徵放到SVM去訓練，用來區分坐姿和睡姿
@@ -67,40 +67,6 @@ def nonzero_variance_pressure_value(nonzero_array, average_pres_val):
 	return variance_1D
 
 
-# 水平軸的變異數
-def variance_x_axis(my_array):
-
-	# 垂直軸總和
-	x_axis_array = np.sum(my_array, axis = 0)
-	print(x_axis_array)
-
-	nonzero_x_axis_array = nonzero_pressure_value(x_axis_array)
-	average_x_axis_pres_val = nonzero_average_pressure_value(nonzero_x_axis_array)
-	variance_x_axis = nonzero_variance_pressure_value(nonzero_x_axis_array, average_x_axis_pres_val)
-	print(nonzero_x_axis_array)
-	print(average_x_axis_pres_val)
-	print(variance_x_axis)
-
-	return variance_x_axis
-
-
-# 垂直軸的變異數
-def variance_y_axis(my_array):
-
-	# 垂直軸總和
-	y_axis_array = np.sum(my_array, axis = 1)
-	# print(y_axis_array)
-
-	nonzero_y_axis_array = nonzero_pressure_value(y_axis_array)
-	average_y_axis_pres_val = nonzero_average_pressure_value(nonzero_y_axis_array)
-	variance_y_axis = nonzero_variance_pressure_value(nonzero_y_axis_array, average_y_axis_pres_val)
-	# print(nonzero_y_axis_array)
-	# print(average_y_axis_pres_val)
-	# print(variance_y_axis)
-
-	return variance_y_axis
-
-
 # 物體的重心for2維影像
 def center_of_gravity(my_array):
 	
@@ -117,11 +83,62 @@ def center_of_gravity(my_array):
 
 			sum_j = x * j
 			sum_j = sum_j + a
-
+	
 	yg = sum_i/np.sum(my_array)
 	xg = sum_j/np.sum(my_array)
 
 	return xg, yg
+
+
+# 水平軸的變異數
+def variance_x_axis(my_array):
+
+	# 垂直軸總和
+	x_axis_array = np.sum(my_array, axis = 0)
+	# print(x_axis_array)
+	weight_x_axis_sum = 0
+	for x, x_axis_val in enumerate(x_axis_array):
+		weight_x_axis_sum = weight_x_axis_sum + x * x_axis_val
+
+	xg = weight_x_axis_sum/np.sum(x_axis_array)
+
+	var_x_axis = 0
+	for x, x_axis_val in enumerate(x_axis_array):
+		var_x_axis = var_x_axis + (x_axis_val / np.sum(x_axis_array) * (x - xg) ** 2)
+	return var_x_axis
+
+
+# 垂直軸的變異數
+def variance_y_axis(my_array):
+
+	# 水平軸總和
+	y_axis_array = np.sum(my_array, axis = 1)
+	# print(y_axis_array)
+	weight_y_axis_sum = 0
+	for y, y_axis_val in enumerate(y_axis_array):
+		weight_y_axis_sum = weight_y_axis_sum + y * y_axis_val
+
+	yg = weight_y_axis_sum/np.sum(y_axis_array)
+
+	var_y_axis = 0
+	for y, y_axis_val in enumerate(y_axis_array):
+		var_y_axis = var_y_axis + (y_axis_val / np.sum(y_axis_array) * (y - yg) ** 2)
+	return var_y_axis
+
+
+# 計算垂直軸的加權平均值
+def average_pressure_value_y_axis(my_array):
+
+	# 水平軸總和
+	y_axis_array = np.sum(my_array, axis = 1)
+	print(y_axis_array)
+
+	average_y_axis = 0
+	size = len(y_axis_array)
+	for i in y_axis_array:
+		average_y_axis = average_y_axis + (1/size * i)
+	print('average_y_axis =', average_y_axis)
+	return average_y_axis
 
 
 # 以重心為圓心，半徑為1.0，以此遞增，所圍成的圓，計算圓中壓中的壓力值點數與總的壓力值點數的比例
@@ -129,35 +146,140 @@ def ratio_of_points(my_array):
 
 	xg, yg =  center_of_gravity(my_array)
 	# point_all = pressure_points(my_array)
-	my_array = thresholding(my_array)
+	binary_array = binarization(my_array)
+	print(binary_array)
 
 	distance_list = []
 	row = 20
 	col = 11
 	radius_1 = 1.0
 
-	for row_index, row_element in enumerate(my_array):
+	for row_index, row_element in enumerate(binary_array):
 		for col_index, col_element in enumerate(row_element):
-			if(col_element == 1):
+			if(col_element == 1023):
 				distance = np.sqrt((xg - col_index) ** 2 + (yg - row_index) ** 2)
+				print('distance =', distance)
 				distance_list.append(distance)
 
-
 	distance_array = np.sort(np.array(distance_list))
-	# print('distance_array =', distance_array)
+	print('distance_array =', distance_array)
 	ratio_max = np.max(distance_array)
-	# print(ratio_max)
+	print(ratio_max)
 	ratio_list = []
-
-	count = 1
+	count = 0
 
 	while count <= math.ceil(ratio_max):
 		ratio = np.size(distance_array[distance_array < radius_1 * count])/np.size(distance_array)
+		print('ratio =', ratio)
 		ratio_list.append(round(ratio, 3))
 		count += 1
 	# ratio_array = np.array(ratio_list)
+	print(ratio_list)
 
 	return ratio_list
+
+
+# 以重心為圓心，半徑為1.0，以此遞增，所圍成的圓，計算圓中壓中的壓力值*個數與壓力總和的比例，找合適半徑
+def ratio_of_pressure_value(my_array):
+
+	xg, yg =  center_of_gravity(my_array)
+	# point_all = pressure_points(my_array)
+	# print(xg)
+	# print(yg)
+
+	distance_list = []
+	pressure_value_list = []
+	row = 20
+	col = 11
+	radius_1 = 1.0
+	count = 0
+
+	for row_index, row_element in enumerate(my_array):
+		for col_index, col_element in enumerate(row_element):
+			if(col_element > 0):
+				distance = np.sqrt((xg - col_index) ** 2 + (yg - row_index) ** 2)
+				distance_list.append(distance)
+				pressure_value_list.append(col_element)
+
+	# print(distance_list)
+	pres_val_ratio_list = []
+	pres_val_ratio = 0
+	# print(np.sum(my_array))
+
+	while count < (max(distance_list) + 1):
+		# print('count =', count)
+		i = 0
+		while i < len(distance_list):
+			# print(distance_list[i])
+			if (distance_list[i] > radius_1 * (count-1)) and (distance_list[i] < radius_1 * count):
+				# print('distance =', distance_list[i])
+				# print('pressure value =', pressure_value_list[i])
+				pres_val_ratio = pressure_value_list[i] + pres_val_ratio
+				# print('pres_val_ratio =', pres_val_ratio)
+			i = i+1
+		# print('pres_val_ratio =', pres_val_ratio)
+		value_ratio = pres_val_ratio / np.sum(my_array)
+		# print('value_ratio =', value_ratio)
+		pres_val_ratio_list.append(round(value_ratio, 3))
+		count = count + 1
+
+	# print(pres_val_ratio_list)
+	return pres_val_ratio_list
+
+
+
+	# return ratio_list
+
+# Local binary patterns
+def local_binary_patterns(my_array):
+
+	xg, yg =  center_of_gravity(my_array)
+
+
+def center_of_gravity_pressure_value(my_array):
+
+	xg, yg =  center_of_gravity(my_array)
+	xg_bottom = int(xg)
+	xg_top = math.ceil(xg)
+	yg_bottom = int(yg)
+	yg_top = math.ceil(yg)
+
+	print('xg_bottom =', xg_bottom)
+	print('xg_top =', xg_top)
+	print('yg_bottom =', yg_bottom)
+	print('yg_top =', yg_top)
+
+	f_Q11 = my_array[yg_bottom][xg_bottom]
+	f_Q12 = my_array[yg_bottom][xg_top]
+	f_Q21 = my_array[yg_top][xg_bottom]
+	f_Q22 = my_array[yg_top][xg_top]
+	print(f_Q11)
+	print(f_Q12)
+	print(f_Q21)
+	print(f_Q22)
+
+
+	A = np.array([xg_top - xg, xg - xg_bottom])
+	B = np.array([[f_Q11, f_Q12],
+				[f_Q21, f_Q22]])
+	C = np.array([[yg_top - yg],
+				[yg - yg_bottom]])
+	print(A)
+	print(B)
+	print(C)
+
+	# center_of_gravity_pressure_value
+	cg_pres_val = A.dot(B)
+	print(cg_pres_val)
+	cg_pres_val = cg_pres_val.dot(C)
+	print(cg_pres_val)
+	cg_pres_val = round(cg_pres_val[0])
+
+	return cg_pres_val
+
+
+
+
 
 def ratio_index(ratio_list):
 
@@ -186,6 +308,10 @@ def ratio_index(ratio_list):
 	# print(np.mean(np.array(ratio3_list)))
 	# print('variance =', np.var(np.array(ratio3_list)))
 
+# 以重心為圓心，畫橢圓，定半徑
+
+
+
 # 主程序
 def main():
 	# open file 
@@ -205,21 +331,18 @@ def main():
 	# average_pres_val = nonzero_average_pressure_value(nonzero_array)
 	# variance_1D = nonzero_variance_pressure_value(nonzero_array, average_pres_val)
 
-	# print('threshold_array =', threshold_array)
-	# print('nonzero_array =', nonzero_array)
-	# print('average_pres_val =', average_pres_val)
-	# print('variance_1D =', variance_1D)
-	# var_x_axis = variance_x_axis(threshold_array)
-	# var_y_axis = variance_y_axis(threshold_array)
+	xg, yg = center_of_gravity(original_array)
 
 	# 非零壓力值的加權平均值list
 	average_pres_val_list = []
 	# 非零壓力值變異數list
 	variance_1D_list = []
-	# 水平軸變異數 list
-	variance_x_axis_list = []
 	# 垂直軸變異數 list
+	average_pres_val_y_axis_list = []
+	# 垂直軸加權平均值 list
 	variance_y_axis_list = []
+	# 定圓心，半徑內壓力總和/整張影像壓力總和 list
+	ratio_of_pressure_value_list = []
 
 
 	xg_list = []
@@ -229,28 +352,38 @@ def main():
 	for item in raw_data:
 		item_array = np.array(item)[:220]
 		item_array = item_array.reshape(row, col)
-		threshold_item_array = thresholding(item_array)
-		nonzero_item_array = nonzero_pressure_value(threshold_item_array)
+		nonzero_item_array = nonzero_pressure_value(item_array)
 		average_pres_val = nonzero_average_pressure_value(nonzero_item_array)
 		variance_1D = nonzero_variance_pressure_value(nonzero_item_array, average_pres_val)
-		var_x_axis = variance_x_axis(threshold_item_array)
-		var_y_axis = variance_y_axis(threshold_item_array)
+		aver_pres_val_y_axis = average_pressure_value_y_axis(item_array)
+		var_y_axis = variance_y_axis(item_array)
+		pres_val_ratio_list = ratio_of_pressure_value(item_array)
 
-		# ratio = ratio_of_points(item_array)
-		# print(ratio)
-		# xg, yg = center_of_gravity(item_array)
-		# xg = int(round(xg))
-		# yg = int(round(yg))
+	# 	# ratio = ratio_of_points(item_array)
+	# 	# print(ratio)
+	# 	# xg, yg = center_of_gravity(item_array)
+	# 	# xg = int(round(xg))
+	# 	# yg = int(round(yg))
+
 
 		average_pres_val_list.append(average_pres_val)
 		variance_1D_list.append(variance_1D)
-		variance_x_axis_list.append(var_x_axis)
+		average_pres_val_y_axis_list.append(aver_pres_val_y_axis)
 		variance_y_axis_list.append(var_y_axis)
+		# ratio_of_pressure_value_list.append(pres_val_ratio_list)
+
+	# print(ratio_of_pressure_value_list[0:5])
+
+	# df = pd.DataFrame(ratio_of_pressure_value_list)
+	# print(df.head)
+	# df.to_csv('test.csv')
+
+
 
 	print('average_pres_val_list =', average_pres_val_list)
 	print('variance_1D_list =', variance_1D_list)
-	print('variance_x_axis_list =', variance_x_axis_list)
-	# print('variance_y_axis_list =', variance_y_axis_list)
+	print('variance_y_axis_list =', variance_y_axis_list)
+	print('average_pres_val_y_axis_list =', average_pres_val_y_axis_list)
 		# ratio_list.append(ratio)
 		# xg_list.append(xg)
 		# yg_list.append(yg)
@@ -272,6 +405,7 @@ def main():
 	# print('horizonal_var_list =', horizonal_var_list)
 	# print('ratio_list =', ratio_list)
 	# print('index_list =', index_list)
+
 
 
 	# target_array = np.hstack((np.zeros(1800), np.ones(1800)))
